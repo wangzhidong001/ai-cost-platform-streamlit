@@ -547,6 +547,163 @@ def role_label(role: str) -> str:
     return {"employee": "员工", "manager": "部门主管", "admin": "预算管理员"}.get(role, role)
 
 
+def usage_status(usage: float) -> tuple[str, str]:
+    if usage >= 1:
+        return "严重超支", "critical"
+    if usage >= 0.9:
+        return "接近超支", "warning"
+    if usage >= 0.8:
+        return "偏高", "warning"
+    return "正常", "normal"
+
+
+def render_analysis_box(title: str, lines: list[str], level: str = "normal") -> None:
+    content = "\n".join(f"- {line}" for line in lines)
+    if level == "critical":
+        st.error(f"**{title}**\n\n{content}")
+    elif level == "warning":
+        st.warning(f"**{title}**\n\n{content}")
+    else:
+        st.info(f"**{title}**\n\n{content}")
+
+
+def render_employee_analysis(user: User, summary: dict[str, float], quota_df: pd.DataFrame) -> None:
+    status, level = usage_status(summary["usage"])
+    lines = [
+        f"本月预算执行状态为 **{status}**：已用 {format_money(summary['used'])}，月度额度 {format_money(summary['quota'])}，剩余 {format_money(summary['remaining'])}，整体使用率 {summary['usage']:.1%}。",
+    ]
+    if quota_df.empty:
+        lines.append("当前未配置工具级额度，建议联系主管先完成月度额度分配。")
+    else:
+        over_df = quota_df[quota_df["使用率"] >= 1].sort_values("使用率", ascending=False)
+        warn_df = quota_df[(quota_df["使用率"] >= 0.8) & (quota_df["使用率"] < 1)].sort_values("使用率", ascending=False)
+        if not over_df.empty:
+            row = over_df.iloc[0]
+            lines.append(f"重点关注工具是 **{row['工具']}**，已用 {format_money(row['已用费用'])}，额度 {format_money(row['月度额度'])}，使用率 {row['使用率']:.1%}，已超出预算。")
+        elif not warn_df.empty:
+            row = warn_df.iloc[0]
+            lines.append(f"最接近超支的工具是 **{row['工具']}**，使用率 {row['使用率']:.1%}，建议提前评估是否需要申请追加额度。")
+        else:
+            top = quota_df.sort_values("已用费用", ascending=False).iloc[0]
+            lines.append(f"当前费用最高的工具是 **{top['工具']}**，已用 {format_money(top['已用费用'])}，预算执行整体可控。")
+
+    model_df = fetch_df(
+        """
+        SELECT COALESCE(c.model_name, t.name) AS 模型, t.name AS 工具, SUM(c.cost_cny) AS 费用
+        FROM consumption_records c
+        JOIN tools t ON t.id=c.tool_id
+        WHERE c.user_id=? AND substr(c.record_date, 1, 7)=substr(?, 1, 7)
+        GROUP BY COALESCE(c.model_name, t.name), t.name
+        ORDER BY 费用 DESC
+        LIMIT 1
+        """,
+        (user.id, month_start()),
+    )
+    if not model_df.empty:
+        row = model_df.iloc[0]
+        lines.append(f"模型费用最高的是 **{row['模型']}**（{row['工具']}），本月费用 {format_money(row['费用'])}，后续使用应优先关注该模型。")
+    if summary["usage"] >= 0.8:
+        lines.append("建议动作：在“额度申请”页提交追加额度，或压降高费用模型/工具的非必要调用。")
+    render_analysis_box("分析说明", lines, level)
+
+
+def render_manager_analysis(user: User, summary: dict[str, float], model_df: pd.DataFrame) -> None:
+    status, level = usage_status(summary["usage"])
+    lines = [
+        f"{user.department_name or '本部门'} 本月预算执行状态为 **{status}**：已用 {format_money(summary['used'])}，月度预算 {format_money(summary['quota'])}，剩余 {format_money(summary['remaining'])}，使用率 {summary['usage']:.1%}。",
+    ]
+    member_df = fetch_df(
+        """
+        SELECT u.display_name AS 员工,
+               COALESCE(used.used_cost, 0) AS 已用费用,
+               COALESCE(budget.monthly_quota, 0) AS 月度额度,
+               CASE WHEN COALESCE(budget.monthly_quota, 0) > 0
+                    THEN COALESCE(used.used_cost, 0) / budget.monthly_quota
+                    ELSE 0 END AS 使用率
+        FROM users u
+        LEFT JOIN (
+            SELECT user_id, SUM(cost_cny) AS used_cost
+            FROM consumption_records
+            WHERE department_id=? AND substr(record_date, 1, 7)=substr(?, 1, 7)
+            GROUP BY user_id
+        ) used ON used.user_id=u.id
+        LEFT JOIN (
+            SELECT user_id, SUM(monthly_quota) AS monthly_quota
+            FROM user_budgets
+            WHERE month=?
+            GROUP BY user_id
+        ) budget ON budget.user_id=u.id
+        WHERE u.department_id=? AND u.role='employee' AND u.status='active'
+        ORDER BY 使用率 DESC, 已用费用 DESC
+        """,
+        (user.department_id, month_start(), month_start(), user.department_id),
+    )
+    risky_members = member_df[member_df["使用率"] >= 1] if not member_df.empty else pd.DataFrame()
+    if not risky_members.empty:
+        row = risky_members.iloc[0]
+        lines.append(f"预算超支最严重的员工是 **{row['员工']}**，已用 {format_money(row['已用费用'])}，额度 {format_money(row['月度额度'])}，使用率 {row['使用率']:.1%}。")
+    elif not member_df.empty:
+        row = member_df.iloc[0]
+        lines.append(f"当前最需要关注的员工是 **{row['员工']}**，使用率 {row['使用率']:.1%}，已用 {format_money(row['已用费用'])}。")
+    if not model_df.empty:
+        row = model_df.iloc[0]
+        lines.append(f"部门内费用最高模型是 **{row['模型']}**，本月费用 {format_money(row['费用'])}，建议复核该模型是否存在集中调用或低价值调用。")
+    if summary["usage"] >= 0.8:
+        lines.append("建议动作：优先审批真实业务需要的追加额度，同时要求高费用员工说明用途，并对高费用模型设置使用规范。")
+    render_analysis_box("分析说明", lines, level)
+
+
+def render_admin_analysis(dept_df: pd.DataFrame, model_rank_df: pd.DataFrame) -> None:
+    total_used = float(dept_df["本月费用"].sum()) if not dept_df.empty else 0
+    total_budget = float(dept_df["月度预算"].sum()) if not dept_df.empty else 0
+    usage = total_used / total_budget if total_budget else 0
+    status, level = usage_status(usage)
+    lines = [
+        f"全公司本月预算执行状态为 **{status}**：已用 {format_money(total_used)}，月度预算 {format_money(total_budget)}，整体使用率 {usage:.1%}。",
+    ]
+    if not dept_df.empty:
+        over_depts = dept_df[dept_df["使用率"] >= 1].sort_values("使用率", ascending=False)
+        focus_depts = over_depts if not over_depts.empty else dept_df.sort_values("使用率", ascending=False)
+        row = focus_depts.iloc[0]
+        lines.append(f"重点关注部门是 **{row['部门']}**，本月费用 {format_money(row['本月费用'])}，月度预算 {format_money(row['月度预算'])}，使用率 {row['使用率']:.1%}。")
+    employee_df = fetch_df(
+        """
+        SELECT u.display_name AS 员工, d.name AS 部门,
+               COALESCE(used.used_cost, 0) AS 已用费用,
+               COALESCE(budget.monthly_quota, 0) AS 月度额度,
+               CASE WHEN COALESCE(budget.monthly_quota, 0) > 0
+                    THEN COALESCE(used.used_cost, 0) / budget.monthly_quota
+                    ELSE 0 END AS 使用率
+        FROM users u
+        JOIN departments d ON d.id=u.department_id
+        LEFT JOIN (
+            SELECT user_id, SUM(cost_cny) AS used_cost
+            FROM consumption_records
+            WHERE substr(record_date, 1, 7)=substr(?, 1, 7)
+            GROUP BY user_id
+        ) used ON used.user_id=u.id
+        LEFT JOIN (
+            SELECT user_id, SUM(monthly_quota) AS monthly_quota
+            FROM user_budgets
+            WHERE month=?
+            GROUP BY user_id
+        ) budget ON budget.user_id=u.id
+        WHERE u.role='employee' AND u.status='active'
+        ORDER BY 使用率 DESC, 已用费用 DESC
+        LIMIT 1
+        """,
+        (month_start(), month_start()),
+    )
+    if not employee_df.empty:
+        row = employee_df.iloc[0]
+        lines.append(f"重点关注员工是 **{row['员工']}**（{row['部门']}），已用 {format_money(row['已用费用'])}，额度 {format_money(row['月度额度'])}，使用率 {row['使用率']:.1%}。")
+    if not model_rank_df.empty:
+        row = model_rank_df.iloc[0]
+        lines.append(f"费用最高模型是 **{row['模型']}**（{row['工具']}），本月费用 {format_money(row['费用'])}，应作为模型成本治理的第一优先级。")
+    lines.append("建议动作：先处理超预算部门，再下钻到员工和模型；对高费用模型建立配额、审批和替代模型策略。")
+    render_analysis_box("分析说明", lines, level)
+
+
 def render_employee_dashboard(user: User) -> None:
     st.header("个人仪表盘")
     summary = get_user_month_summary(user.id, month_start())
@@ -593,6 +750,7 @@ def render_employee_dashboard(user: User) -> None:
         )
         st.subheader("预实对比分析")
         st.plotly_chart(px.bar(actual_df, x="工具", y="金额", color="类型", barmode="group"), use_container_width=True)
+    render_employee_analysis(user, summary, quota_df)
 
     tool_df = fetch_df(
         """
@@ -816,6 +974,7 @@ def render_manager_dashboard(user: User) -> None:
         ]
     )
     st.plotly_chart(px.bar(dept_actual_df, x="指标", y="金额", color="指标"), use_container_width=True)
+    render_manager_analysis(user, summary, model_df)
     left, right = st.columns(2)
     with left:
         st.subheader("成员消费排行")
@@ -1037,6 +1196,7 @@ def render_company_overview(user: User) -> None:
         """,
         (month,),
     )
+    render_admin_analysis(dept_df, model_rank_df)
     left, right = st.columns(2)
     with left:
         st.subheader("各部门使用率")
