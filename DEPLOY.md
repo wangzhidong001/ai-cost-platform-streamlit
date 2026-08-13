@@ -18,8 +18,10 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 Then open:
 
 ```text
-http://<host-ip>:8501
+http://172.27.135.214:8501
 ```
+
+For another host, replace `172.27.135.214` with that server's intranet IP.
 
 ## Demo Data
 

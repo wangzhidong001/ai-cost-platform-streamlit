@@ -610,6 +610,7 @@ def inject_css() -> None:
           border: 1px solid var(--line);
           border-radius: 14px;
           padding: 18px 20px;
+          margin-top: 42px;
           box-shadow: 0 18px 42px rgba(15, 23, 42, 0.10);
         }
         .login-form-shell img { width: 157px; height: 27px; object-fit: contain; margin-bottom: 8px; }
