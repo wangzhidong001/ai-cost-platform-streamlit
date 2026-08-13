@@ -27,10 +27,10 @@ def main() -> None:
         tool_id = int(app.fetch_df("SELECT id FROM tools LIMIT 1")["id"].iloc[0])
         app.execute(
             """
-            INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (employee.id, employee.department_id, tool_id, app.month_start(), 123.0, "端到端测试追加额度申请"),
+            (employee.id, employee.department_id, tool_id, app.month_start(), 123.0, "端到端测试追加额度申请", app.local_now_text()),
         )
         app_id = int(app.fetch_df("SELECT MAX(id) AS id FROM quota_applications")["id"].iloc[0])
         app.review_application(app_id, manager, "approved", 123.0, "自测通过")

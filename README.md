@@ -64,3 +64,18 @@ python verify_demo_data.py
 - `currency`
 - `billing_type`
 - `notes`
+
+## 大模型厂商接口对接
+
+管理员在“数据导入 → 厂商接口对接”中填写接口根地址、用量接口路径、密钥和日期范围。系统会以 Bearer Token 调用接口，并识别 `data`、`records`、`items` 或 `usage` 数组。
+
+推荐接口返回字段：
+
+- `username`：平台用户名
+- `tool`：平台中的工具名称
+- `record_date`：消费日期
+- `cost_cny`：人民币费用
+- `model_name`：模型名称
+- `tokens_input` / `tokens_output` / `api_calls`
+
+接口密钥只在当前请求中使用，不写入数据库。

@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import plotly.express as px
@@ -18,6 +21,7 @@ import streamlit as st
 
 APP_TITLE = "AI 费用管理平台"
 DB_PATH = Path(os.getenv("AI_COST_DB", "data/ai_cost.db"))
+APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Shanghai")
 PAGE_SIZE = 50
 
 BILLING_TYPE_LABELS = {
@@ -93,6 +97,14 @@ def add_months(value: date, months: int) -> date:
     year = value.year + (value.month - 1 + months) // 12
     month = (value.month - 1 + months) % 12 + 1
     return date(year, month, 1)
+
+
+def local_now() -> datetime:
+    return datetime.now(ZoneInfo(APP_TIMEZONE))
+
+
+def local_now_text() -> str:
+    return local_now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def hash_password(password: str) -> str:
@@ -360,10 +372,10 @@ def init_db() -> None:
         tool_id = conn.execute("SELECT id FROM tools WHERE name='Claude Team'").fetchone()["id"]
         conn.execute(
             """
-            INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (employee_id, dept_ids["TECH"], tool_id, current_month.isoformat(), 800, "本月研发任务增加，需要追加 Claude Team 调试额度。"),
+            (employee_id, dept_ids["TECH"], tool_id, current_month.isoformat(), 800, "本月研发任务增加，需要追加 Claude Team 调试额度。", local_now_text()),
         )
         conn.execute(
             """
@@ -1035,10 +1047,10 @@ def render_quota_application(user: User) -> None:
         else:
             execute(
                 """
-                INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO quota_applications(user_id, department_id, tool_id, month, amount, reason, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (user.id, user.department_id, tool_id, app_month, amount, reason.strip()),
+                (user.id, user.department_id, tool_id, app_month, amount, reason.strip(), local_now_text()),
             )
             add_audit(user.id, "create", "quota_application", tool_name, f"申请 {amount:.2f} 元")
             st.success("额度申请已提交，等待主管审批。")
@@ -1225,10 +1237,10 @@ def review_application(app_id: int, reviewer: User, status: str, approved_amount
         conn.execute(
             """
             UPDATE quota_applications
-            SET status=?, approved_amount=?, reviewer_id=?, review_comment=?, reviewed_at=CURRENT_TIMESTAMP
+            SET status=?, approved_amount=?, reviewer_id=?, review_comment=?, reviewed_at=?
             WHERE id=?
             """,
-            (status, approved_amount, reviewer.id, comment, app_id),
+            (status, approved_amount, reviewer.id, comment, local_now_text(), app_id),
         )
         if status in {"approved", "partial"} and approved_amount > 0:
             row = conn.execute(
@@ -1395,6 +1407,15 @@ def render_data_import(user: User) -> None:
     if not require_role(user, {"admin"}):
         return
     st.header("数据导入")
+    st.caption("支持本地文件上传，也支持从大模型厂商或统一网关接口同步用量数据。")
+    file_tab, api_tab = st.tabs(["文件上传", "厂商接口对接"])
+    with file_tab:
+        render_file_import(user)
+    with api_tab:
+        render_api_import(user)
+
+
+def render_file_import(user: User) -> None:
     st.caption("支持 CSV/XLSX。请先下载模板，按模板填写后上传；模板列名用于系统识别，请勿修改。")
     st.download_button(
         "下载导入模板",
@@ -1424,6 +1445,72 @@ def render_data_import(user: User) -> None:
     if st.button("确认导入", type="primary"):
         batch_id = import_consumption(prepared, user.id)
         st.success(f"导入完成，批次号：{batch_id}")
+        st.rerun()
+
+
+def render_api_import(user: User) -> None:
+    st.caption("适用于 OpenAI 兼容网关、DeepSeek、Claude、火山方舟或企业自建网关的用量接口。接口返回数据会先标准化为导入模板，再校验入库。")
+    with st.expander("接口返回格式要求", expanded=False):
+        st.markdown(
+            """
+            接口应返回 JSON。系统会自动识别 `data`、`records`、`items` 或 `usage` 数组字段。
+
+            推荐字段：
+            - 用户：`username` / `user` / `email`
+            - 工具：`tool` / `provider` / `vendor`
+            - 模型：`model_name` / `model`
+            - 日期：`record_date` / `date` / `created_at`
+            - 费用：`cost_cny` / `cost` / `amount`
+            - 用量：`tokens_input`、`tokens_output`、`api_calls`
+            """
+        )
+    vendor = st.selectbox("厂商/接口类型", ["OpenAI 兼容接口", "DeepSeek", "Claude", "火山方舟", "自定义接口"])
+    default_base = {
+        "OpenAI 兼容接口": "https://api.openai.com",
+        "DeepSeek": "https://api.deepseek.com",
+        "Claude": "https://api.anthropic.com",
+        "火山方舟": "https://ark.cn-beijing.volces.com",
+        "自定义接口": "",
+    }[vendor]
+    with st.form("api_import_form"):
+        col1, col2 = st.columns(2)
+        base_url = col1.text_input("接口根地址", value=default_base, placeholder="https://api.example.com")
+        endpoint = col2.text_input("用量接口路径", value="/v1/usage", placeholder="/v1/usage")
+        col3, col4, col5 = st.columns(3)
+        start_date = col3.date_input("开始日期", value=date.today().replace(day=1))
+        end_date = col4.date_input("结束日期", value=date.today())
+        default_tool = col5.selectbox("默认工具映射", fetch_df("SELECT name FROM tools ORDER BY id")["name"].tolist())
+        api_key = st.text_input("接口密钥", type="password", placeholder="Bearer Token，不会保存到数据库")
+        submitted = st.form_submit_button("拉取并预览")
+    if submitted:
+        try:
+            raw_payload = fetch_vendor_usage(base_url, endpoint, api_key, start_date, end_date)
+            api_df = normalize_vendor_usage(raw_payload, default_tool)
+        except Exception as exc:
+            st.session_state.pop("api_import_prepared", None)
+            st.error(f"接口拉取失败：{exc}")
+            return
+        if api_df.empty:
+            st.session_state.pop("api_import_prepared", None)
+            st.warning("接口返回成功，但没有可导入的用量记录。")
+            return
+        ok, message, prepared = validate_import(api_df)
+        if not ok:
+            st.session_state.pop("api_import_prepared", None)
+            st.error(message)
+            st.dataframe(localize_df(api_df.head(50)), hide_index=True, use_container_width=True)
+            return
+        st.session_state["api_import_prepared"] = prepared
+        st.success(f"接口数据校验通过，共 {len(prepared)} 条。")
+    prepared = st.session_state.get("api_import_prepared")
+    if prepared is None:
+        st.info("填写接口信息后点击“拉取并预览”。若厂商接口字段不同，可先由网关转换为上方推荐格式。")
+        return
+    st.dataframe(localize_df(prepared.head(50)), hide_index=True, use_container_width=True)
+    if st.button("确认导入接口数据", type="primary"):
+        batch_id = import_consumption(prepared, user.id, source="api")
+        st.session_state.pop("api_import_prepared", None)
+        st.success(f"接口数据导入完成，批次号：{batch_id}")
         st.rerun()
 
 
@@ -1458,8 +1545,72 @@ def validate_import(df: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
     return True, f"校验通过，共 {len(prepared)} 条记录。", prepared
 
 
-def import_consumption(df: pd.DataFrame, actor_id: int) -> str:
-    batch_id = f"imp-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
+def fetch_vendor_usage(base_url: str, endpoint: str, api_key: str, start_date: date, end_date: date) -> dict[str, Any]:
+    if not base_url.strip() or not endpoint.strip():
+        raise ValueError("接口根地址和用量接口路径不能为空。")
+    if end_date < start_date:
+        raise ValueError("结束日期不能早于开始日期。")
+    base = base_url.rstrip("/")
+    path = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+    query = urlencode({"start_date": start_date.isoformat(), "end_date": end_date.isoformat()})
+    url = f"{base}{path}?{query}"
+    headers = {"Accept": "application/json"}
+    if api_key.strip():
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
+    request = Request(url, headers=headers, method="GET")
+    with urlopen(request, timeout=30) as response:
+        body = response.read().decode("utf-8")
+    import json
+
+    payload = json.loads(body)
+    if not isinstance(payload, dict):
+        raise ValueError("接口返回必须是 JSON 对象。")
+    return payload
+
+
+def normalize_vendor_usage(payload: dict[str, Any], default_tool: str) -> pd.DataFrame:
+    records: Any = None
+    for key in ("data", "records", "items", "usage"):
+        if isinstance(payload.get(key), list):
+            records = payload[key]
+            break
+    if records is None and isinstance(payload.get("data"), dict):
+        for key in ("records", "items", "usage"):
+            if isinstance(payload["data"].get(key), list):
+                records = payload["data"][key]
+                break
+    if records is None:
+        records = []
+    rows: list[dict[str, Any]] = []
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        username = item.get("username") or item.get("user") or item.get("email")
+        record_date = item.get("record_date") or item.get("date") or item.get("created_at") or date.today().isoformat()
+        if isinstance(record_date, (int, float)):
+            record_date = datetime.fromtimestamp(record_date, ZoneInfo(APP_TIMEZONE)).date().isoformat()
+        cost = item.get("cost_cny", item.get("cost", item.get("amount", 0)))
+        rows.append(
+            {
+                "username": username,
+                "tool": item.get("tool") or item.get("provider") or item.get("vendor") or default_tool,
+                "record_date": str(record_date)[:10],
+                "cost_cny": cost,
+                "model_name": item.get("model_name") or item.get("model") or "",
+                "tokens_input": item.get("tokens_input") or item.get("input_tokens") or item.get("prompt_tokens") or 0,
+                "tokens_output": item.get("tokens_output") or item.get("output_tokens") or item.get("completion_tokens") or 0,
+                "api_calls": item.get("api_calls") or item.get("requests") or item.get("count") or 0,
+                "currency": item.get("currency") or "CNY",
+                "billing_type": item.get("billing_type") or "usage",
+                "notes": item.get("notes") or "厂商接口同步",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def import_consumption(df: pd.DataFrame, actor_id: int, source: str = "import") -> str:
+    prefix = "api" if source == "api" else "imp"
+    batch_id = f"{prefix}-{local_now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
     with get_conn() as conn:
         users = {
             row["username"]: row
@@ -1479,7 +1630,7 @@ def import_consumption(df: pd.DataFrame, actor_id: int) -> str:
                     user_id, department_id, tool_id, model_name, record_date, tokens_input,
                     tokens_output, api_calls, cost_original, currency, cost_cny, billing_type,
                     import_batch_id, source, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user["id"],
@@ -1495,12 +1646,13 @@ def import_consumption(df: pd.DataFrame, actor_id: int) -> str:
                     float(row["cost_cny"]),
                     billing_type,
                     batch_id,
+                    source,
                     row["notes"],
                 ),
             )
         conn.execute(
             "INSERT INTO audit_logs(actor_id, action, entity, entity_id, detail) VALUES (?, 'import', 'consumption_records', ?, ?)",
-            (actor_id, batch_id, f"导入 {len(df)} 条消费记录"),
+            (actor_id, batch_id, f"{SOURCE_LABELS.get(source, source)} {len(df)} 条消费记录"),
         )
     generate_budget_alerts()
     return batch_id
