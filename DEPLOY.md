@@ -30,6 +30,31 @@ python verify_demo_data.py
 
 The SQLite database is intentionally not committed. It is created automatically on first run.
 
+## 7x24 Always-On Deployment
+
+For a stable address that colleagues can open anytime, deploy on an always-on company server or cloud VM. Do not use a laptop plus tunnel for production.
+
+Recommended Docker deployment:
+
+```bash
+git clone https://github.com/wangzhidong001/ai-cost-platform-streamlit.git
+cd ai-cost-platform-streamlit
+docker compose up -d --build
+```
+
+Open:
+
+```text
+http://<server-ip>:8501
+```
+
+Operational notes:
+
+- Keep TCP 8501 open on the server firewall or put Nginx/HTTPS in front of it.
+- `restart: unless-stopped` keeps the app running after process failure or server reboot.
+- SQLite data is stored in the Docker volume `ai-cost-data`.
+- Health check endpoint: `http://<server-ip>:8501/_stcore/health`.
+
 ## Streamlit Community Cloud
 
 Use these values when creating the app in Streamlit Community Cloud:

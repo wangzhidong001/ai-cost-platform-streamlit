@@ -1,0 +1,15 @@
+services:
+  ai-cost-platform:
+    build: .
+    container_name: ai-cost-platform
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      AI_COST_DB: /app/data/ai_cost.db
+      AI_COST_AUTO_SEED: "1"
+    volumes:
+      - ai-cost-data:/app/data
+
+volumes:
+  ai-cost-data:

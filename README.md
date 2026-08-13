@@ -11,6 +11,22 @@ streamlit run app.py
 
 首次启动会自动创建 SQLite 数据库：`data/ai_cost.db`。
 
+## 7×24 在线部署
+
+临时公网隧道适合演示，不适合长期在线。需要同事随时登录时，建议部署到公司内网服务器或云服务器：
+
+```bash
+docker compose up -d --build
+```
+
+服务地址：
+
+```text
+http://<服务器IP>:8501
+```
+
+容器已配置自动重启和健康检查，数据库保存在 Docker 卷 `ai-cost-data` 中。
+
 ## 演示账号
 
 | 角色 | 用户名 | 密码 |

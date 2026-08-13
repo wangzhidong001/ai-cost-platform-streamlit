@@ -20,6 +20,59 @@ APP_TITLE = "AI 费用管理平台"
 DB_PATH = Path(os.getenv("AI_COST_DB", "data/ai_cost.db"))
 PAGE_SIZE = 50
 
+BILLING_TYPE_LABELS = {
+    "seat": "席位月租",
+    "usage": "按量计费",
+    "hybrid": "混合计费",
+    "credit": "积分计费",
+}
+STATUS_LABELS = {
+    "active": "启用",
+    "inactive": "停用",
+    "pending": "待审批",
+    "approved": "已通过",
+    "partial": "部分通过",
+    "rejected": "已驳回",
+}
+ROLE_LABELS = {"employee": "员工", "manager": "部门主管", "admin": "预算管理员"}
+SOURCE_LABELS = {"manual": "手工录入", "import": "导入", "api": "接口同步"}
+LEVEL_LABELS = {"warning": "预警", "critical": "严重"}
+SCOPE_LABELS = {"employee": "员工", "department": "部门", "company": "公司"}
+ACTION_LABELS = {
+    "login": "登录",
+    "create": "新增",
+    "upsert": "新增/更新",
+    "import": "导入",
+    "seed": "演示造数",
+    "seed_failed": "演示造数失败",
+    "approved": "审批通过",
+    "partial": "部分通过",
+    "rejected": "驳回",
+}
+ENTITY_LABELS = {
+    "session": "会话",
+    "quota_application": "额度申请",
+    "user_budget": "员工额度",
+    "department_budget": "部门预算",
+    "consumption_records": "消费记录",
+    "demo_data": "演示数据",
+    "user": "用户",
+    "tool": "工具",
+}
+COLUMN_LABELS = {
+    "username": "用户名",
+    "tool": "工具",
+    "record_date": "消费日期",
+    "cost_cny": "人民币费用",
+    "model_name": "模型",
+    "tokens_input": "输入 Token",
+    "tokens_output": "输出 Token",
+    "api_calls": "接口调用次数",
+    "currency": "币种",
+    "billing_type": "计费类型",
+    "notes": "备注",
+}
+
 
 @dataclass(frozen=True)
 class User:
@@ -389,16 +442,83 @@ def inject_css() -> None:
         """
         <style>
         :root {
-          --brand: #2563eb;
+          --brand: #1d4ed8;
+          --brand-soft: #eff6ff;
+          --ink: #0f172a;
           --muted: #64748b;
-          --surface: rgba(148, 163, 184, 0.10);
+          --line: #e2e8f0;
+          --surface: #ffffff;
+          --surface-soft: #f8fafc;
         }
-        .block-container { padding-top: 1.4rem; padding-bottom: 2rem; }
+        .stApp { background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); }
+        .block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1280px; }
+        section[data-testid="stSidebar"] {
+          background: #0f172a;
+          border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        section[data-testid="stSidebar"] * { color: #e5e7eb !important; }
+        section[data-testid="stSidebar"] [role="radiogroup"] label {
+          border-radius: 8px;
+          padding: 6px 8px;
+        }
+        h1, h2, h3 { color: var(--ink); letter-spacing: 0; }
+        h1 { font-size: 2rem; }
+        h2 { font-size: 1.45rem; }
+        h3 { font-size: 1.08rem; }
         [data-testid="stMetric"] {
           background: var(--surface);
-          border: 1px solid rgba(148, 163, 184, 0.22);
+          border: 1px solid var(--line);
           border-radius: 8px;
-          padding: 14px 16px;
+          padding: 16px 18px;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        }
+        [data-testid="stMetricLabel"] p { color: var(--muted); }
+        [data-testid="stMetricValue"] { color: var(--ink); }
+        div[data-testid="stDataFrame"] {
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .hero {
+          background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 54%, #0e7490 100%);
+          border-radius: 12px;
+          padding: 34px;
+          color: #fff;
+          min-height: 360px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+        }
+        .hero h1 { color: #fff; font-size: 2.4rem; margin: 0 0 12px; }
+        .hero p { color: #dbeafe; font-size: 1rem; line-height: 1.7; }
+        .hero-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 24px;
+        }
+        .hero-stat {
+          background: rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 8px;
+          padding: 12px;
+        }
+        .hero-stat strong { display: block; font-size: 1.25rem; color: #fff; }
+        .hero-stat span { color: #bfdbfe; font-size: 0.84rem; }
+        .login-card {
+          background: var(--surface);
+          border: 1px solid var(--line);
+          border-radius: 12px;
+          padding: 26px;
+          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.10);
+        }
+        .section-card {
+          background: rgba(255, 255, 255, 0.76);
+          border: 1px solid var(--line);
+          border-radius: 10px;
+          padding: 16px 18px;
+          margin: 10px 0 14px;
         }
         .status-pill {
           display: inline-block;
@@ -408,6 +528,7 @@ def inject_css() -> None:
           border: 1px solid rgba(148, 163, 184, 0.36);
         }
         .hint { color: var(--muted); font-size: 13px; }
+        .small-label { color: var(--muted); font-size: 0.86rem; margin-bottom: 4px; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -416,6 +537,30 @@ def inject_css() -> None:
 
 def format_money(value: float | int | None) -> str:
     return f"¥{float(value or 0):,.2f}"
+
+
+def label_value(value: Any, mapping: dict[str, str]) -> Any:
+    return mapping.get(str(value), value)
+
+
+def localize_df(df: pd.DataFrame) -> pd.DataFrame:
+    localized = df.copy()
+    mapping_by_column = {
+        "计费类型": BILLING_TYPE_LABELS,
+        "状态": STATUS_LABELS,
+        "角色": ROLE_LABELS,
+        "来源": SOURCE_LABELS,
+        "级别": LEVEL_LABELS,
+        "范围": SCOPE_LABELS,
+        "动作": ACTION_LABELS,
+        "对象": ENTITY_LABELS,
+        "billing_type": BILLING_TYPE_LABELS,
+    }
+    for column, mapping in mapping_by_column.items():
+        if column in localized.columns:
+            localized[column] = localized[column].map(lambda value: label_value(value, mapping))
+    localized = localized.rename(columns=COLUMN_LABELS)
+    return localized
 
 
 def to_excel(df: pd.DataFrame) -> bytes:
@@ -495,11 +640,29 @@ def get_department_month_summary(department_id: int, month: str) -> dict[str, fl
 
 
 def render_login() -> None:
-    st.title(APP_TITLE)
-    st.caption("企业 AI 工具费用、预算、预警与审批一体化管理")
-    left, right = st.columns([1.1, 0.9])
+    left, right = st.columns([1.15, 0.85], gap="large")
     with left:
-        st.subheader("登录")
+        st.markdown(
+            """
+            <div class="hero">
+              <div>
+                <div class="small-label">企业内部费用治理平台</div>
+                <h1>AI 费用管理平台</h1>
+                <p>统一管理 AI 工具费用、预算执行、额度审批和超支预警，支持员工、部门主管和预算管理员分角色查看。</p>
+              </div>
+              <div class="hero-grid">
+                <div class="hero-stat"><strong>8 类</strong><span>AI 工具费率</span></div>
+                <div class="hero-stat"><strong>100+</strong><span>演示消费记录</span></div>
+                <div class="hero-stat"><strong>7×24</strong><span>支持在线部署</span></div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.subheader("账号登录")
+        st.caption("请输入企业账号，系统将按角色展示对应看板。")
         with st.form("login_form"):
             username = st.text_input("用户名", value="admin")
             password = st.text_input("密码", value="admin123", type="password")
@@ -511,7 +674,6 @@ def render_login() -> None:
                 add_audit(user.id, "login", "session", str(user.id), "用户登录")
                 st.rerun()
             st.error("用户名或密码错误，或账号已停用。")
-    with right:
         st.markdown("#### 演示账号")
         st.dataframe(
             pd.DataFrame(
@@ -524,6 +686,7 @@ def render_login() -> None:
             hide_index=True,
             use_container_width=True,
         )
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_sidebar(user: User) -> str:
@@ -544,7 +707,7 @@ def render_sidebar(user: User) -> str:
 
 
 def role_label(role: str) -> str:
-    return {"employee": "员工", "manager": "部门主管", "admin": "预算管理员"}.get(role, role)
+    return ROLE_LABELS.get(role, role)
 
 
 def usage_status(usage: float) -> tuple[str, str]:
@@ -799,7 +962,10 @@ def render_consumption(user: User, department_id: int | None = None) -> None:
             "日期范围",
             value=(date.today().replace(day=1) - timedelta(days=150), date.today()),
         )
-        billing = col3.selectbox("计费类型", ["全部", "seat", "usage", "hybrid", "credit"])
+        billing_label = col3.selectbox("计费类型", ["全部"] + list(BILLING_TYPE_LABELS.values()))
+        billing = "全部"
+        if billing_label != "全部":
+            billing = {label: code for code, label in BILLING_TYPE_LABELS.items()}[billing_label]
 
     params: list[Any] = []
     where = []
@@ -835,9 +1001,9 @@ def render_consumption(user: User, department_id: int | None = None) -> None:
     if df.empty:
         st.info("当前筛选条件下暂无消费记录。")
         return
-    st.dataframe(df.head(PAGE_SIZE), hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(df.head(PAGE_SIZE)), hide_index=True, use_container_width=True)
     st.caption(f"共 {len(df)} 条，当前展示前 {PAGE_SIZE} 条。")
-    st.download_button("导出 Excel", to_excel(df), "消费明细.xlsx", use_container_width=False)
+    st.download_button("导出电子表格", to_excel(localize_df(df)), "消费明细.xlsx", use_container_width=False)
 
 
 def render_quota_application(user: User) -> None:
@@ -892,7 +1058,7 @@ def render_quota_application(user: User) -> None:
     if df.empty:
         st.info("暂无额度申请记录。")
     else:
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
 
 
 def render_employee_alerts(user: User) -> None:
@@ -910,7 +1076,7 @@ def render_employee_alerts(user: User) -> None:
     if df.empty:
         st.info("暂无预警通知。")
         return
-    st.dataframe(df.drop(columns=["id"]), hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(df.drop(columns=["id"])), hide_index=True, use_container_width=True)
     unread = df.loc[df["状态"] == "未读", "id"].tolist()
     if unread and st.button("全部标记为已读"):
         placeholders = ",".join("?" for _ in unread)
@@ -928,7 +1094,7 @@ def render_tool_rates() -> None:
         ORDER BY id
         """
     )
-    st.dataframe(df, hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
 
 
 def render_manager_dashboard(user: User) -> None:
@@ -1010,7 +1176,7 @@ def render_quota_approval(user: User) -> None:
     if df.empty:
         st.info("暂无待审批申请。")
     else:
-        st.dataframe(df.drop(columns=["id"]), hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(df.drop(columns=["id"])), hide_index=True, use_container_width=True)
         selected_id = st.selectbox("选择申请单", df["id"].tolist(), format_func=lambda x: f"#{x} · {df.loc[df['id']==x, '申请人'].iloc[0]}")
         selected = df[df["id"] == selected_id].iloc[0]
         col1, col2 = st.columns(2)
@@ -1048,7 +1214,7 @@ def render_quota_approval(user: User) -> None:
     if history_df.empty:
         st.info("暂无审批记录。")
     else:
-        st.dataframe(history_df, hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(history_df), hide_index=True, use_container_width=True)
 
 
 def review_application(app_id: int, reviewer: User, status: str, approved_amount: float, comment: str) -> None:
@@ -1084,7 +1250,7 @@ def review_application(app_id: int, reviewer: User, status: str, approved_amount
                 INSERT INTO alerts(scope, user_id, department_id, level, title, message)
                 VALUES ('employee', ?, ?, 'warning', '额度申请已审批', ?)
                 """,
-                (app["user_id"], app["department_id"], f"申请单 #{app_id} 已{status}，批准金额 {approved_amount:.2f} 元。"),
+                (app["user_id"], app["department_id"], f"申请单 #{app_id} {STATUS_LABELS.get(status, status)}，批准金额 {approved_amount:.2f} 元。"),
             )
         conn.execute(
             "INSERT INTO audit_logs(actor_id, action, entity, entity_id, detail) VALUES (?, ?, 'quota_application', ?, ?)",
@@ -1222,14 +1388,14 @@ def render_company_overview(user: User) -> None:
     st.subheader("部门预算对比")
     dept_display = dept_df.copy()
     dept_display["使用率"] = dept_display["使用率"].map(lambda value: f"{value:.1%}")
-    st.dataframe(dept_display, hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(dept_display), hide_index=True, use_container_width=True)
 
 
 def render_data_import(user: User) -> None:
     if not require_role(user, {"admin"}):
         return
     st.header("数据导入")
-    st.caption("支持 CSV/XLSX。必需列：username、tool、record_date、cost_cny。可选列：model_name、tokens_input、tokens_output、api_calls、currency、billing_type、notes。")
+    st.caption("支持 CSV/XLSX。请先下载模板，按模板填写后上传；模板列名用于系统识别，请勿修改。")
     st.download_button(
         "下载导入模板",
         data=get_import_template(),
@@ -1251,10 +1417,10 @@ def render_data_import(user: User) -> None:
     ok, message, prepared = validate_import(df)
     if not ok:
         st.error(message)
-        st.dataframe(df.head(20), hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(df.head(20)), hide_index=True, use_container_width=True)
         return
     st.success(message)
-    st.dataframe(prepared.head(20), hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(prepared.head(20)), hide_index=True, use_container_width=True)
     if st.button("确认导入", type="primary"):
         batch_id = import_consumption(prepared, user.id)
         st.success(f"导入完成，批次号：{batch_id}")
@@ -1374,7 +1540,7 @@ def render_budget_admin(user: User) -> None:
         ORDER BY b.year DESC, d.name
         """
     )
-    st.dataframe(budgets, hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(budgets), hide_index=True, use_container_width=True)
     with st.form("dept_budget"):
         col1, col2, col3 = st.columns(3)
         dept_name = col1.selectbox("部门", departments["name"].tolist())
@@ -1413,14 +1579,15 @@ def render_user_admin(user: User) -> None:
         ORDER BY u.id
         """
     )
-    st.dataframe(df, hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
     departments = fetch_df("SELECT id, name FROM departments WHERE status='active' ORDER BY name")
     with st.form("user_create"):
         st.subheader("新增用户")
         col1, col2, col3 = st.columns(3)
         username = col1.text_input("用户名")
         display_name = col2.text_input("姓名")
-        role = col3.selectbox("角色", ["employee", "manager", "admin"])
+        role_label_selected = col3.selectbox("角色", list(ROLE_LABELS.values()))
+        role = {label: code for code, label in ROLE_LABELS.items()}[role_label_selected]
         col4, col5 = st.columns(2)
         dept_name = col4.selectbox("部门", ["无"] + departments["name"].tolist())
         password = col5.text_input("初始密码", type="password", value="ChangeMe123")
@@ -1452,11 +1619,12 @@ def render_tool_admin(user: User) -> None:
     df = fetch_df(
         "SELECT id, name AS 工具, billing_type AS 计费类型, currency AS 币种, unit_price AS 单价, monthly_seat_price AS 席位月租, status AS 状态 FROM tools ORDER BY id"
     )
-    st.dataframe(df.drop(columns=["id"]), hide_index=True, use_container_width=True)
+    st.dataframe(localize_df(df.drop(columns=["id"])), hide_index=True, use_container_width=True)
     with st.form("tool_upsert"):
         col1, col2, col3 = st.columns(3)
         name = col1.text_input("工具名称")
-        billing_type = col2.selectbox("计费类型", ["seat", "usage", "hybrid", "credit"])
+        billing_label_selected = col2.selectbox("计费类型", list(BILLING_TYPE_LABELS.values()))
+        billing_type = {label: code for code, label in BILLING_TYPE_LABELS.items()}[billing_label_selected]
         currency = col3.selectbox("币种", ["CNY", "USD"])
         col4, col5 = st.columns(2)
         unit_price = col4.number_input("单价", min_value=0.0, format="%.6f")
@@ -1500,7 +1668,7 @@ def render_alert_center(user: User) -> None:
     if df.empty:
         st.info("暂无预警。")
     else:
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
 
 
 def render_audit_logs(user: User) -> None:
@@ -1520,7 +1688,7 @@ def render_audit_logs(user: User) -> None:
     if df.empty:
         st.info("暂无审计日志。")
     else:
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
 
 
 def render_department_report(user: User) -> None:
@@ -1544,8 +1712,8 @@ def render_department_report(user: User) -> None:
     if df.empty:
         st.info("暂无可导出的部门报表。")
         return
-    st.dataframe(df, hide_index=True, use_container_width=True)
-    st.download_button("导出部门月报", to_excel(df), "部门费用月报.xlsx")
+    st.dataframe(localize_df(df), hide_index=True, use_container_width=True)
+    st.download_button("导出部门月报", to_excel(localize_df(df)), "部门费用月报.xlsx")
 
 
 def render_page(user: User, page: str) -> None:
