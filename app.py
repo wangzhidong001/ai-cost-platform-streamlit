@@ -526,70 +526,32 @@ def inject_css() -> None:
         .hero p { color: #dbeafe; font-size: 1rem; line-height: 1.7; }
         .login-logo { width: 157px; height: 27px; margin-bottom: 18px; object-fit: contain; }
         .login-subtitle { font-size: 0.9rem; color: rgba(255,255,255,0.86); letter-spacing: 0; }
-        .login-illustration {
-          width: min(430px, 90%);
-          min-height: 250px;
-          margin: 32px auto 12px;
-          position: relative;
-        }
-        .platform {
-          position: absolute;
-          left: 50%;
-          top: 118px;
-          width: 250px;
-          height: 150px;
-          background: linear-gradient(145deg, #e0f2fe, #ffffff);
-          border-radius: 26px;
-          transform: translateX(-50%) rotateX(58deg) rotateZ(-34deg);
-          box-shadow: 0 28px 58px rgba(15, 23, 42, 0.22);
-        }
-        .door {
-          position: absolute;
-          left: 50%;
-          top: 50px;
-          width: 110px;
-          height: 150px;
-          transform: translateX(-50%);
-          background: linear-gradient(160deg, #ffffff, #bfdbfe);
-          border: 5px solid rgba(255,255,255,0.72);
-          border-radius: 16px;
-          box-shadow: 0 20px 42px rgba(15, 23, 42, 0.20);
-        }
-        .door:after {
-          content: "";
-          position: absolute;
-          right: 18px;
-          top: 70px;
-          width: 10px;
-          height: 10px;
-          background: #2563eb;
-          border-radius: 50%;
-        }
-        .ai-tile {
-          position: absolute;
-          width: 70px;
-          height: 54px;
-          border-radius: 12px;
+        .feature-list { margin: 34px 0 18px; display: grid; gap: 12px; }
+        .feature-card {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-height: 64px;
+          padding: 13px 18px;
+          border-radius: 10px;
+          background: rgba(79, 70, 229, 0.78);
+          border: 1px solid rgba(255,255,255,0.18);
+          box-shadow: 0 14px 32px rgba(30, 41, 59, 0.14);
           color: #fff;
           font-weight: 700;
+        }
+        .feature-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 9px;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 16px 30px rgba(15, 23, 42, 0.20);
+          background: rgba(255,255,255,0.18);
+          color: #8be9ff;
+          flex: 0 0 34px;
         }
-        .tile-1 { left: 42px; top: 32px; background: #8b5cf6; transform: rotate(-18deg); }
-        .tile-2 { right: 48px; top: 60px; background: #f43f5e; transform: rotate(12deg); }
-        .tile-3 { left: 4px; top: 128px; background: #facc15; transform: rotate(10deg); }
-        .cloud-dot {
-          position: absolute;
-          width: 52px;
-          height: 24px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.72);
-          box-shadow: 70px 54px 0 rgba(255,255,255,0.34), 230px 32px 0 rgba(255,255,255,0.34);
-          left: 104px;
-          top: 48px;
-        }
+        .feature-card span { color: #fff; }
         .hero-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -609,7 +571,7 @@ def inject_css() -> None:
           border: 1px solid var(--line);
           border-radius: 14px;
           padding: 34px;
-          margin-top: 62px;
+          margin-top: 30px;
           box-shadow: 0 22px 52px rgba(15, 23, 42, 0.16);
         }
         .login-card h3 { text-align: center; font-size: 1.28rem; margin-bottom: 12px; }
@@ -625,7 +587,6 @@ def inject_css() -> None:
         .login-card .stButton > button:hover { background: #0f56d8; color: #fff; }
         .login-page-note { text-align: center; color: #64748b; font-size: 0.88rem; }
         .demo-title { margin-top: 18px; color: #334155; font-weight: 700; }
-        .login-card img { display: block; margin: 0 auto 12px; width: 157px; height: 27px; object-fit: contain; }
         @media (max-width: 900px) {
           .hero { min-height: 420px; padding: 28px; }
           .login-card { margin-top: 12px; }
@@ -768,13 +729,10 @@ def render_login() -> None:
                 <div class="login-subtitle">Ruijie AI Cost Management System</div>
                 <h1>锐捷AI费用管理系统</h1>
                 <p>统一管理 AI 工具费用、预算执行、额度审批和超支预警，支持员工、部门主管和预算管理员分角色查看。</p>
-                <div class="login-illustration">
-                  <div class="cloud-dot"></div>
-                  <div class="ai-tile tile-1">AI</div>
-                  <div class="ai-tile tile-2">费用</div>
-                  <div class="ai-tile tile-3">预算</div>
-                  <div class="platform"></div>
-                  <div class="door"></div>
+                <div class="feature-list">
+                  <div class="feature-card"><div class="feature-icon">◆</div><span>多计费模型统一计费，自动折算 RMB / USD</span></div>
+                  <div class="feature-card"><div class="feature-icon">↪</div><span>额度申请 · 审批 · 预警 全流程线上化</span></div>
+                  <div class="feature-card"><div class="feature-icon">▮</div><span>部门预算 / 模型费用 / 成员排名 一目了然</span></div>
                 </div>
               </div>
               <div class="hero-grid">
@@ -788,8 +746,6 @@ def render_login() -> None:
         )
     with right:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        if logo_uri:
-            st.markdown(f'<img src="{logo_uri}" alt="Ruijie Networks" />', unsafe_allow_html=True)
         st.markdown("<h3>账号登录</h3>", unsafe_allow_html=True)
         st.markdown('<div class="login-page-note">请输入企业账号，系统将按角色展示对应看板</div>', unsafe_allow_html=True)
         with st.form("login_form"):
