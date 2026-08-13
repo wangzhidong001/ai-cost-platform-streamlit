@@ -321,6 +321,22 @@ def init_db() -> None:
         )
 
 
+def ensure_demo_data() -> None:
+    if os.getenv("AI_COST_AUTO_SEED", "1") != "1":
+        return
+    existing = fetch_one(
+        "SELECT COUNT(*) AS c FROM consumption_records WHERE import_batch_id='demo-100-v1'"
+    )
+    if existing and existing["c"]:
+        return
+    try:
+        import seed_demo_data
+
+        seed_demo_data.main()
+    except Exception as exc:
+        add_audit(None, "seed_failed", "demo_data", "demo-100-v1", str(exc))
+
+
 def add_audit(actor_id: int | None, action: str, entity: str, entity_id: str, detail: str) -> None:
     execute(
         "INSERT INTO audit_logs(actor_id, action, entity, entity_id, detail) VALUES (?, ?, ?, ?, ?)",
@@ -1413,6 +1429,7 @@ def main() -> None:
     st.set_page_config(page_title=APP_TITLE, page_icon="💰", layout="wide")
     inject_css()
     init_db()
+    ensure_demo_data()
     user = get_current_user()
     if not user:
         render_login()
