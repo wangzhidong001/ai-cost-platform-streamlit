@@ -604,17 +604,16 @@ def inject_css() -> None:
         }
         .hero-stat strong { display: block; font-size: 1.25rem; color: #fff; }
         .hero-stat span { color: #bfdbfe; font-size: 0.84rem; }
-        .login-card {
-          background: var(--surface);
+        .login-panel-title { text-align: left; font-size: 1.42rem; font-weight: 800; color: #0f172a; margin: 8px 0 8px; }
+        .login-form-shell {
+          background: #ffffff;
           border: 1px solid var(--line);
           border-radius: 14px;
-          padding: 34px;
-          margin-top: 62px;
-          box-shadow: 0 22px 52px rgba(15, 23, 42, 0.16);
+          padding: 18px 20px;
+          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.10);
         }
-        .login-card h3 { text-align: center; font-size: 1.28rem; margin-bottom: 12px; }
-        .login-card [data-testid="stForm"] { border: 0; padding: 0; }
-        .login-card .stButton > button {
+        .login-form-shell img { width: 157px; height: 27px; object-fit: contain; margin-bottom: 8px; }
+        div[data-testid="stForm"] .stButton > button {
           background: #1263f1;
           color: #fff;
           border: none;
@@ -622,13 +621,11 @@ def inject_css() -> None:
           height: 42px;
           font-weight: 700;
         }
-        .login-card .stButton > button:hover { background: #0f56d8; color: #fff; }
-        .login-page-note { text-align: center; color: #64748b; font-size: 0.88rem; }
+        div[data-testid="stForm"] .stButton > button:hover { background: #0f56d8; color: #fff; }
+        .login-page-note { color: #64748b; font-size: 0.88rem; margin-bottom: 14px; }
         .demo-title { margin-top: 18px; color: #334155; font-weight: 700; }
-        .login-card img { display: block; margin: 0 auto 12px; width: 157px; height: 27px; object-fit: contain; }
         @media (max-width: 900px) {
           .hero { min-height: 420px; padding: 28px; }
-          .login-card { margin-top: 12px; }
         }
         .section-card {
           background: rgba(255, 255, 255, 0.76);
@@ -787,11 +784,16 @@ def render_login() -> None:
             unsafe_allow_html=True,
         )
     with right:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        if logo_uri:
-            st.markdown(f'<img src="{logo_uri}" alt="Ruijie Networks" />', unsafe_allow_html=True)
-        st.markdown("<h3>账号登录</h3>", unsafe_allow_html=True)
-        st.markdown('<div class="login-page-note">请输入企业账号，系统将按角色展示对应看板</div>', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="login-form-shell">
+              <img src="{logo_uri}" alt="Ruijie Networks" />
+              <div class="login-panel-title">账号登录</div>
+              <div class="login-page-note">请输入企业账号，系统将按角色展示对应看板</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         with st.form("login_form"):
             username = st.text_input("用户名", value="admin")
             password = st.text_input("密码", value="admin123", type="password")
@@ -815,7 +817,6 @@ def render_login() -> None:
             hide_index=True,
             use_container_width=True,
         )
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_sidebar(user: User) -> str:
