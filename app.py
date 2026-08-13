@@ -524,7 +524,7 @@ def inject_css() -> None:
         }
         .hero h1 { color: #fff; font-size: 2.4rem; margin: 0 0 12px; }
         .hero p { color: #dbeafe; font-size: 1rem; line-height: 1.7; }
-        .login-logo { width: 190px; height: auto; margin-bottom: 18px; }
+        .login-logo { width: 157px; height: 27px; margin-bottom: 18px; object-fit: contain; }
         .login-subtitle { font-size: 0.9rem; color: rgba(255,255,255,0.86); letter-spacing: 0; }
         .login-illustration {
           width: min(430px, 90%);
@@ -625,7 +625,7 @@ def inject_css() -> None:
         .login-card .stButton > button:hover { background: #0f56d8; color: #fff; }
         .login-page-note { text-align: center; color: #64748b; font-size: 0.88rem; }
         .demo-title { margin-top: 18px; color: #334155; font-weight: 700; }
-        .login-card img { display: block; margin: 0 auto 12px; width: 160px; }
+        .login-card img { display: block; margin: 0 auto 12px; width: 157px; height: 27px; object-fit: contain; }
         @media (max-width: 900px) {
           .hero { min-height: 420px; padding: 28px; }
           .login-card { margin-top: 12px; }
