@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import base64
 import io
 import os
 import sqlite3
@@ -19,9 +20,10 @@ import plotly.express as px
 import streamlit as st
 
 
-APP_TITLE = "AI 费用管理平台"
+APP_TITLE = "锐捷AI费用管理系统"
 DB_PATH = Path(os.getenv("AI_COST_DB", "data/ai_cost.db"))
 APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Shanghai")
+LOGO_PATH = Path("assets/ruijie_logo.svg")
 PAGE_SIZE = 50
 
 BILLING_TYPE_LABELS = {
@@ -105,6 +107,13 @@ def local_now() -> datetime:
 
 def local_now_text() -> str:
     return local_now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def logo_data_uri() -> str:
+    if not LOGO_PATH.exists():
+        return ""
+    encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def hash_password(password: str) -> str:
@@ -492,18 +501,95 @@ def inject_css() -> None:
           overflow: hidden;
         }
         .hero {
-          background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 54%, #0e7490 100%);
-          border-radius: 12px;
-          padding: 34px;
+          background: radial-gradient(circle at 20% 10%, rgba(125, 211, 252, 0.42), transparent 30%),
+                      linear-gradient(145deg, #1e40af 0%, #0284c7 48%, #38bdf8 100%);
+          border-radius: 0;
+          padding: 38px 46px;
           color: #fff;
-          min-height: 360px;
+          min-height: 620px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+        }
+        .hero:before {
+          content: "";
+          position: absolute;
+          inset: auto -80px -120px -80px;
+          height: 260px;
+          background: rgba(255,255,255,0.16);
+          transform: rotate(-7deg);
         }
         .hero h1 { color: #fff; font-size: 2.4rem; margin: 0 0 12px; }
         .hero p { color: #dbeafe; font-size: 1rem; line-height: 1.7; }
+        .login-logo { width: 190px; height: auto; margin-bottom: 18px; }
+        .login-subtitle { font-size: 0.9rem; color: rgba(255,255,255,0.86); letter-spacing: 0; }
+        .login-illustration {
+          width: min(430px, 90%);
+          min-height: 250px;
+          margin: 32px auto 12px;
+          position: relative;
+        }
+        .platform {
+          position: absolute;
+          left: 50%;
+          top: 118px;
+          width: 250px;
+          height: 150px;
+          background: linear-gradient(145deg, #e0f2fe, #ffffff);
+          border-radius: 26px;
+          transform: translateX(-50%) rotateX(58deg) rotateZ(-34deg);
+          box-shadow: 0 28px 58px rgba(15, 23, 42, 0.22);
+        }
+        .door {
+          position: absolute;
+          left: 50%;
+          top: 50px;
+          width: 110px;
+          height: 150px;
+          transform: translateX(-50%);
+          background: linear-gradient(160deg, #ffffff, #bfdbfe);
+          border: 5px solid rgba(255,255,255,0.72);
+          border-radius: 16px;
+          box-shadow: 0 20px 42px rgba(15, 23, 42, 0.20);
+        }
+        .door:after {
+          content: "";
+          position: absolute;
+          right: 18px;
+          top: 70px;
+          width: 10px;
+          height: 10px;
+          background: #2563eb;
+          border-radius: 50%;
+        }
+        .ai-tile {
+          position: absolute;
+          width: 70px;
+          height: 54px;
+          border-radius: 12px;
+          color: #fff;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 16px 30px rgba(15, 23, 42, 0.20);
+        }
+        .tile-1 { left: 42px; top: 32px; background: #8b5cf6; transform: rotate(-18deg); }
+        .tile-2 { right: 48px; top: 60px; background: #f43f5e; transform: rotate(12deg); }
+        .tile-3 { left: 4px; top: 128px; background: #facc15; transform: rotate(10deg); }
+        .cloud-dot {
+          position: absolute;
+          width: 52px;
+          height: 24px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.72);
+          box-shadow: 70px 54px 0 rgba(255,255,255,0.34), 230px 32px 0 rgba(255,255,255,0.34);
+          left: 104px;
+          top: 48px;
+        }
         .hero-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -521,9 +607,28 @@ def inject_css() -> None:
         .login-card {
           background: var(--surface);
           border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 26px;
-          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.10);
+          border-radius: 14px;
+          padding: 34px;
+          margin-top: 62px;
+          box-shadow: 0 22px 52px rgba(15, 23, 42, 0.16);
+        }
+        .login-card h3 { text-align: center; font-size: 1.28rem; margin-bottom: 12px; }
+        .login-card [data-testid="stForm"] { border: 0; padding: 0; }
+        .login-card .stButton > button {
+          background: #1263f1;
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          height: 42px;
+          font-weight: 700;
+        }
+        .login-card .stButton > button:hover { background: #0f56d8; color: #fff; }
+        .login-page-note { text-align: center; color: #64748b; font-size: 0.88rem; }
+        .demo-title { margin-top: 18px; color: #334155; font-weight: 700; }
+        .login-card img { display: block; margin: 0 auto 12px; width: 160px; }
+        @media (max-width: 900px) {
+          .hero { min-height: 420px; padding: 28px; }
+          .login-card { margin-top: 12px; }
         }
         .section-card {
           background: rgba(255, 255, 255, 0.76);
@@ -652,15 +757,25 @@ def get_department_month_summary(department_id: int, month: str) -> dict[str, fl
 
 
 def render_login() -> None:
+    logo_uri = logo_data_uri()
     left, right = st.columns([1.15, 0.85], gap="large")
     with left:
         st.markdown(
-            """
+            f"""
             <div class="hero">
               <div>
-                <div class="small-label">企业内部费用治理平台</div>
-                <h1>AI 费用管理平台</h1>
+                <img class="login-logo" src="{logo_uri}" alt="Ruijie Networks" />
+                <div class="login-subtitle">Ruijie AI Cost Management System</div>
+                <h1>锐捷AI费用管理系统</h1>
                 <p>统一管理 AI 工具费用、预算执行、额度审批和超支预警，支持员工、部门主管和预算管理员分角色查看。</p>
+                <div class="login-illustration">
+                  <div class="cloud-dot"></div>
+                  <div class="ai-tile tile-1">AI</div>
+                  <div class="ai-tile tile-2">费用</div>
+                  <div class="ai-tile tile-3">预算</div>
+                  <div class="platform"></div>
+                  <div class="door"></div>
+                </div>
               </div>
               <div class="hero-grid">
                 <div class="hero-stat"><strong>8 类</strong><span>AI 工具费率</span></div>
@@ -673,8 +788,10 @@ def render_login() -> None:
         )
     with right:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.subheader("账号登录")
-        st.caption("请输入企业账号，系统将按角色展示对应看板。")
+        if logo_uri:
+            st.markdown(f'<img src="{logo_uri}" alt="Ruijie Networks" />', unsafe_allow_html=True)
+        st.markdown("<h3>账号登录</h3>", unsafe_allow_html=True)
+        st.markdown('<div class="login-page-note">请输入企业账号，系统将按角色展示对应看板</div>', unsafe_allow_html=True)
         with st.form("login_form"):
             username = st.text_input("用户名", value="admin")
             password = st.text_input("密码", value="admin123", type="password")
@@ -686,7 +803,7 @@ def render_login() -> None:
                 add_audit(user.id, "login", "session", str(user.id), "用户登录")
                 st.rerun()
             st.error("用户名或密码错误，或账号已停用。")
-        st.markdown("#### 演示账号")
+        st.markdown('<div class="demo-title">演示账号</div>', unsafe_allow_html=True)
         st.dataframe(
             pd.DataFrame(
                 [

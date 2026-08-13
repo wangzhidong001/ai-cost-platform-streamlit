@@ -1,4 +1,4 @@
-# AI 费用管理平台 Streamlit 应用
+# 锐捷AI费用管理系统 Streamlit 应用
 
 这是根据 `AI费用管理平台_Streamlit设计文档.md` 实现的可部署 Streamlit 原型，覆盖三类角色视图、费用明细、预算、额度申请审批、数据导入、预警和审计日志。
 

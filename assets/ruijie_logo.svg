@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="58" viewBox="0 0 220 58" role="img" aria-label="Ruijie Networks">
+  <rect width="220" height="58" fill="none"/>
+  <g fill="#e60020">
+    <path d="M13 10h54c10 0 16 5 15 13-1 8-8 12-18 12h-9l20 13H54L35 35H24l-4 13H4L13 10zm16 10-2 7h34c4 0 6-1 6-4 1-2-1-3-5-3H29z"/>
+    <path d="M92 18h13l-8 30H84l8-30zm4-10h13l-2 7H94l2-7z"/>
+    <path d="M113 18h13l-6 22h22l6-22h13l-8 30h-48l8-30z"/>
+    <path d="M165 18h44l-2 8h-31l-1 4h29l-2 7h-29l-1 4h32l-2 7h-45l8-30z"/>
+  </g>
+  <text x="7" y="56" font-family="Arial, Helvetica, sans-serif" font-size="11" font-style="italic" fill="#e60020">Networks</text>
+</svg>
